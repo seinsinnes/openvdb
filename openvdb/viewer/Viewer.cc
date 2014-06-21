@@ -28,6 +28,16 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
+#if defined(__APPLE__) || defined(MACOSX)
+#include <OpenGL/gl.h>
+#include <OpenGL/glu.h>
+#else
+#include <GL/gl.h>
+#include <GL/glu.h>
+#endif
+
+#include <GLFW/glfw3.h>
+
 #include "Viewer.h"
 
 #include "Camera.h"
@@ -42,15 +52,7 @@
 #include <vector>
 #include <limits>
 
-#if defined(__APPLE__) || defined(MACOSX)
-#include <OpenGL/gl.h>
-#include <OpenGL/glu.h>
-#else
-#include <GL/gl.h>
-#include <GL/glu.h>
-#endif
 
-#include <GL/glfw.h>
 
 
 namespace openvdb_viewer {
@@ -101,6 +103,7 @@ private:
     std::string mGridName, mProgName, mGridInfo, mTransformInfo, mTreeInfo;
     int mWheelPos;
     bool mShiftIsDown, mCtrlIsDown, mShowInfo;
+    GLFWwindow* mWindow;
 }; // class ViewerImpl
 
 
@@ -114,42 +117,42 @@ tbb::mutex sLock;
 
 
 void
-keyCB(int key, int action)
+keyCB(GLFWwindow *wnd, int key, int scancode, int action, int mods)
 {
     if (sViewer) sViewer->keyCallback(key, action);
 }
 
 
 void
-mouseButtonCB(int button, int action)
+mouseButtonCB(GLFWwindow *wnd, int button, int action, int mods)
 {
     if (sViewer) sViewer->mouseButtonCallback(button, action);
 }
 
 
 void
-mousePosCB(int x, int y)
+mousePosCB(GLFWwindow *wnd, double x, double y)
 {
     if (sViewer) sViewer->mousePosCallback(x, y);
 }
 
 
 void
-mouseWheelCB(int pos)
+mouseWheelCB(GLFWwindow *wnd, double pos, double ypos)
 {
     if (sViewer) sViewer->mouseWheelCallback(pos);
 }
 
 
 void
-windowSizeCB(int width, int height)
+windowSizeCB(GLFWwindow *wnd, int width, int height)
 {
     if (sViewer) sViewer->windowSizeCallback(width, height);
 }
 
 
 void
-windowRefreshCB()
+windowRefreshCB(GLFWwindow *wnd)
 {
     if (sViewer) sViewer->windowRefreshCallback();
 }
@@ -226,6 +229,7 @@ ViewerImpl::ViewerImpl()
 void
 ViewerImpl::init(const std::string& progName, bool verbose)
 {
+    GLFWwindow *tmpWnd;
     mProgName = progName;
 
     if (glfwInit() != GL_TRUE) {
@@ -233,12 +237,13 @@ ViewerImpl::init(const std::string& progName, bool verbose)
     }
 
     if (verbose) {
-        if (glfwOpenWindow(100, 100, 8, 8, 8, 8, 24, 0, GLFW_WINDOW)) {
+        if (tmpWnd = glfwCreateWindow(100, 100, "",NULL,NULL)) {
             int major, minor, rev;
+            glfwMakeContextCurrent(tmpWnd);
             glfwGetVersion(&major, &minor, &rev);
             std::cout << "GLFW: " << major << "." << minor << "." << rev << "\n"
                 << "OpenGL: " << glGetString(GL_VERSION) << std::endl;
-            glfwCloseWindow();
+            glfwDestroyWindow(tmpWnd);
         }
     }
 }
@@ -255,7 +260,7 @@ ViewerImpl::setWindowTitle(double fps)
         << (mGridName.empty() ? std::string("OpenVDB") : mGridName)
         << " (" << (mGridIdx + 1) << " of " << mGrids.size() << ") @ "
         << std::setprecision(1) << std::fixed << fps << " fps";
-    glfwSetWindowTitle(ss.str().c_str());
+    glfwSetWindowTitle(mWindow, ss.str().c_str());
 }
 
 
@@ -282,12 +287,12 @@ ViewerImpl::render()
     // Render text
 
     if (mShowInfo) {
-        BitmapFont13::enableFontRendering();
+        BitmapFont13::enableFontRendering(mWindow);
 
         glColor3f (0.2, 0.2, 0.2);
 
         int width, height;
-        glfwGetWindowSize(&width, &height);
+        glfwGetWindowSize(mWindow, &width, &height);
 
         BitmapFont13::print(10, height - 13 - 10, mGridInfo);
         BitmapFont13::print(10, height - 13 - 30, mTransformInfo);
@@ -405,17 +410,17 @@ ViewerImpl::viewGrids(const openvdb::GridCPtrVec& gridList, int width, int heigh
     mGridName.clear();
 
     // Create window
-    if (!glfwOpenWindow(width, height,  // Window size
-                       8, 8, 8, 8,      // # of R,G,B, & A bits
-                       32, 0,           // # of depth & stencil buffer bits
-                       GLFW_WINDOW))    // Window mode
+    if (!(mWindow = glfwCreateWindow(width, height,  // Window size
+                       mProgName.c_str(), NULL,NULL)))    // Window mode
     {
         glfwTerminate();
         return;
     }
 
-    glfwSetWindowTitle(mProgName.c_str());
-    glfwSwapBuffers();
+    glfwMakeContextCurrent(mWindow);
+
+    //glfwSetWindowTitle(mProgName.c_str());
+    glfwSwapBuffers(mWindow);
 
     BitmapFont13::initialize();
 
@@ -447,6 +452,7 @@ ViewerImpl::viewGrids(const openvdb::GridCPtrVec& gridList, int width, int heigh
     openvdb::Vec3d extents = bbox.extents();
     double max_extent = std::max(extents[0], std::max(extents[1], extents[2]));
 
+    mCamera->setWindow(mWindow);
     mCamera->setTarget(bbox.getCenter(), max_extent);
     mCamera->lookAtTarget();
     mCamera->setSpeed(/*zoom=*/0.1, /*strafe=*/0.002, /*tumbling=*/0.02);
@@ -455,12 +461,12 @@ ViewerImpl::viewGrids(const openvdb::GridCPtrVec& gridList, int width, int heigh
 
     // register callback functions
 
-    glfwSetKeyCallback(keyCB);
-    glfwSetMouseButtonCallback(mouseButtonCB);
-    glfwSetMousePosCallback(mousePosCB);
-    glfwSetMouseWheelCallback(mouseWheelCB);
-    glfwSetWindowSizeCallback(windowSizeCB);
-    glfwSetWindowRefreshCallback(windowRefreshCB);
+    glfwSetKeyCallback(mWindow, keyCB);
+    glfwSetMouseButtonCallback(mWindow, mouseButtonCB);
+    glfwSetCursorPosCallback(mWindow, mousePosCB);
+    glfwSetScrollCallback(mWindow, mouseWheelCB);
+    glfwSetWindowSizeCallback(mWindow, windowSizeCB);
+    glfwSetWindowRefreshCallback(mWindow, windowRefreshCB);
 
 
     //////////
@@ -499,11 +505,14 @@ ViewerImpl::viewGrids(const openvdb::GridCPtrVec& gridList, int width, int heigh
             frame = 0;
         }
 
+        // Process events
+        glfwPollEvents();
+
         // Swap front and back buffers
-        glfwSwapBuffers();
+        glfwSwapBuffers(mWindow);
 
     // exit if the esc key is pressed or the window is closed.
-    } while (!glfwGetKey(GLFW_KEY_ESC) && glfwGetWindowParam(GLFW_OPENED));
+    } while (!glfwGetKey(mWindow, GLFW_KEY_ESCAPE));
 
     glfwTerminate();
 }
@@ -614,9 +623,9 @@ ViewerImpl::keyCallback(int key, int action)
     OPENVDB_START_THREADSAFE_STATIC_WRITE
 
     mCamera->keyCallback(key, action);
-    const bool keyPress = glfwGetKey(key) == GLFW_PRESS;
-    mShiftIsDown = glfwGetKey(GLFW_KEY_LSHIFT);
-    mCtrlIsDown = glfwGetKey(GLFW_KEY_LCTRL);
+    const bool keyPress = glfwGetKey(mWindow, key) == GLFW_PRESS;
+    mShiftIsDown = glfwGetKey(mWindow, GLFW_KEY_LEFT_SHIFT);
+    mCtrlIsDown = glfwGetKey(mWindow, GLFW_KEY_LEFT_CONTROL);
 
     if (keyPress) {
         switch (key) {

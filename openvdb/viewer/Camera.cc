@@ -28,9 +28,6 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
-#include "Camera.h"
-
-#include <cmath>
 
 #if defined(__APPLE__) || defined(MACOSX)
 #include <OpenGL/gl.h>
@@ -40,7 +37,13 @@
 #include <GL/glu.h>
 #endif
 
-#include <GL/glfw.h>
+#include <GLFW/glfw3.h>
+
+#include "Camera.h"
+
+#include <cmath>
+
+
 
 
 namespace openvdb_viewer {
@@ -112,13 +115,18 @@ Camera::setTarget(const openvdb::Vec3d& p, double dist)
     mTargetDistance = dist;
 }
 
+void Camera::setWindow(GLFWwindow *wnd)
+{
+    mWindow = wnd;
+}
+
 
 void
 Camera::aim()
 {
     // Get the window size
     int width, height;
-    glfwGetWindowSize(&width, &height);
+    glfwGetWindowSize(mWindow, &width, &height);
 
     // Make sure that height is non-zero to avoid division by zero
     height = std::max(1, height);
@@ -166,13 +174,13 @@ Camera::aim()
 void
 Camera::keyCallback(int key, int )
 {
-    if (glfwGetKey(key) == GLFW_PRESS) {
+    if (glfwGetKey(mWindow,key) == GLFW_PRESS) {
         switch(key) {
             case GLFW_KEY_SPACE:
                 mZoomMode = true;
                 break;
         }
-    } else if (glfwGetKey(key) == GLFW_RELEASE) {
+    } else if (glfwGetKey(mWindow, key) == GLFW_RELEASE) {
         switch(key) {
             case GLFW_KEY_SPACE:
                 mZoomMode = false;

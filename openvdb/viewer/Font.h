@@ -51,7 +51,7 @@ public:
 
     static void initialize();
 
-    static void enableFontRendering();
+    static void enableFontRendering(GLFWwindow *wnd);
     static void disableFontRendering();
 
     static void print(GLint px, GLint py, const std::string&);

@@ -51,6 +51,8 @@ public:
 
     void setTarget(const openvdb::Vec3d& p, double dist = 1.0);
 
+    void setWindow( GLFWwindow *wnd);
+
     void setNearFarPlanes(double n, double f) { mNearPlane = n; mFarPlane = f; }
     void setFieldOfView(double degrees) { mFov = degrees; }
     void setSpeed(double zoomSpeed, double strafeSpeed, double tumblingSpeed);
@@ -59,6 +61,8 @@ public:
     void mouseButtonCallback(int button, int action);
     void mousePosCallback(int x, int y);
     void mouseWheelCallback(int pos, int prevPos);
+
+    
 
     bool needsDisplay() const { return mNeedsDisplay; }
 
@@ -73,6 +77,7 @@ private:
     bool mMouseDown, mStartTumbling, mZoomMode, mChanged, mNeedsDisplay;
     double mMouseXPos, mMouseYPos;
     int mWheelPos;
+    GLFWwindow* mWindow;
 
     static const double sDeg2rad;
 }; // class Camera
